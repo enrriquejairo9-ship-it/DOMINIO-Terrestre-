@@ -1,0 +1,755 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#202820">
+<title>DOMINIO TERRESTRE</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#202620;color:#fff;font-family:Arial,sans-serif;touch-action:none}
+#renderCanvas{width:100%;height:100%;display:block;outline:none}
+#loading{position:fixed;inset:0;z-index:20;background:#171b18;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}
+#loading h1{font-size:25px;letter-spacing:3px;margin:20px 0 8px}
+#loading p{font-size:11px;color:#b6c0b0;letter-spacing:2px}
+.loader{width:40px;height:40px;border:3px solid #465044;border-top-color:#d1dfc4;border-radius:50%;animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#hud{position:fixed;inset:0;pointer-events:none}
+.topbar{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;gap:8px}
+.panel{background:#151b18dd;border:1px solid #8a998366;border-radius:4px;padding:9px 11px;box-shadow:0 3px 12px #0004}
+.logo{font-size:12px;font-weight:900;letter-spacing:2px}
+.small{font-size:10px;color:#bdc6ba;margin-top:4px}
+#status{text-align:right;font-size:10px}
+#mission{position:absolute;top:78px;left:12px;max-width:220px;font-size:11px}
+#mission b{letter-spacing:1px}
+#missionText{margin-top:5px;color:#c5cec2;line-height:1.4}
+#scoreText{margin-top:5px;color:#d6e2ca}
+#crosshair{position:absolute;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%)}
+#crosshair:before,#crosshair:after{content:"";position:absolute;background:#f1f4e9;box-shadow:0 0 3px #000}
+#crosshair:before{width:2px;height:18px;left:8px}
+#crosshair:after{height:2px;width:18px;top:8px}
+#bottomInfo{position:absolute;bottom:13px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:flex-end}
+#healthBox{width:155px}
+#healthLabel{font-size:10px;letter-spacing:1px;margin-bottom:5px}
+#healthTrack{height:7px;background:#353b32}
+#health{height:100%;width:100%;background:#a6bd86}
+#controls{position:fixed;inset:0;pointer-events:none}
+#stickArea{position:absolute;left:18px;bottom:65px;width:125px;height:125px;pointer-events:auto;touch-action:none}
+#stickBase{position:absolute;inset:0;border-radius:50%;background:#d4ddd11c;border:2px solid #dce5d344}
+#stick{position:absolute;left:37px;top:37px;width:51px;height:51px;border-radius:50%;background:#c7d3bf55;border:2px solid #e2eadb99}
+.action{position:absolute;right:19px;bottom:88px;pointer-events:auto;touch-action:manipulation;border:1px solid #d5e1cc88;background:#202b23e8;color:white;border-radius:50%;width:65px;height:65px;font-size:10px;font-weight:bold}
+#jumpBtn{right:94px;bottom:52px;width:48px;height:48px}
+#captureBtn{right:20px;bottom:165px;width:60px;height:60px}
+#notice{position:absolute;left:50%;bottom:28px;transform:translateX(-50%);background:#151b18e8;padding:9px 14px;border-radius:4px;font-size:11px;white-space:nowrap;display:none}
+@media(min-width:700px){
+#stickArea{width:140px;height:140px;left:30px;bottom:30px}
+#stick{left:42px;top:42px}
+.action{bottom:35px;right:30px}
+#jumpBtn{right:110px;bottom:35px}
+#captureBtn{right:30px;bottom:120px}
+}
+</style>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+</head>
+<body>
+<div id="loading">
+  <div class="loader"></div>
+  <h1>DOMINIO TERRESTRE</h1>
+  <p>PREPARANDO ZONA DE OPERACIONES</p>
+</div>
+<canvas id="renderCanvas"></canvas>
+<div id="hud">
+  <div class="topbar">
+    <div class="panel">
+      <div class="logo">DT // OPERACIONES</div>
+      <div class="small">SECTOR ALFA · CAMPO ABIERTO</div>
+    </div>
+    <div class="panel" id="status">
+      <div>ESTADO: OPERATIVO</div>
+      <div class="small" id="fps">INICIANDO MOTOR</div>
+    </div>
+  </div>
+  <div class="panel" id="mission">
+    <b>OBJETIVO PRINCIPAL</b>
+    <div id="missionText">Localiza la zona verde y asegúrala.</div>
+    <div id="scoreText">ZONAS ASEGURADAS: 0</div>
+  </div>
+  <div id="crosshair"></div>
+  <div id="bottomInfo">
+    <div class="panel" id="healthBox">
+      <div id="healthLabel">ESTADO DEL SOLDADO</div>
+      <div id="healthTrack"><div id="health"></div></div>
+      <div class="small">SALUD: <span id="healthNum">100</span>%</div>
+    </div>
+    <div class="panel" style="text-align:right">
+      <div style="font-size:11px;font-weight:bold">INFANTERÍA</div>
+      <div class="small" id="position">SECTOR 01</div>
+    </div>
+  </div>
+</div>
+<div id="controls">
+  <div id="stickArea"><div id="stickBase"></div><div id="stick"></div></div>
+  <button class="action" id="fireBtn">DISPARAR</button>
+  <button class="action" id="jumpBtn">SALTAR</button>
+  <button class="action" id="captureBtn">ASEGURAR<br>ZONA</button>
+  <div id="notice"></div>
+</div>
+<script>
+(function(){
+"use strict";
+
+const canvas=document.getElementById("renderCanvas");
+const loading=document.getElementById("loading");
+const notice=document.getElementById("notice");
+
+if(!window.BABYLON){
+  loading.innerHTML="<h1>DOMINIO TERRESTRE</h1><p>No se pudo cargar Babylon.js. Comprueba tu conexión.</p>";
+  return;
+}
+
+const engine=new BABYLON.Engine(canvas,true,{
+  preserveDrawingBuffer:false,
+  stencil:true,
+  antialias:true,
+  adaptToDeviceRatio:true,
+  powerPreference:"high-performance"
+});
+
+/* Calidad alta; si el móvil va lento, usa 1.5 */
+engine.setHardwareScalingLevel(1);
+
+const scene=new BABYLON.Scene(engine);
+scene.clearColor=new BABYLON.Color4(.56,.66,.70,1);
+scene.collisionsEnabled=true;
+scene.gravity=new BABYLON.Vector3(0,-.32,0);
+scene.skipPointerMovePicking=true;
+scene.environmentIntensity=1;
+
+scene.imageProcessingConfiguration.toneMappingEnabled=true;
+scene.imageProcessingConfiguration.toneMappingType=
+  BABYLON.ImageProcessingConfiguration.TONEMAPPING_ACES;
+scene.imageProcessingConfiguration.exposure=1.1;
+scene.imageProcessingConfiguration.contrast=1.15;
+
+scene.fogMode=BABYLON.Scene.FOGMODE_EXP2;
+scene.fogDensity=.0015;
+scene.fogColor=new BABYLON.Color3(.56,.64,.63);
+
+const camera=new BABYLON.ArcRotateCamera(
+  "camera",Math.PI*1.5,1.12,8,
+  new BABYLON.Vector3(0,1.5,-24),scene
+);
+camera.lowerRadiusLimit=4;
+camera.upperRadiusLimit=11;
+camera.lowerBetaLimit=.35;
+camera.upperBetaLimit=1.48;
+camera.wheelPrecision=65;
+camera.panningSensibility=0;
+camera.inertia=.72;
+camera.inputs.clear();
+
+const hemi=new BABYLON.HemisphericLight(
+  "ambient",new BABYLON.Vector3(0,1,0),scene
+);
+hemi.intensity=.72;
+hemi.groundColor=new BABYLON.Color3(.24,.27,.22);
+
+const sun=new BABYLON.DirectionalLight(
+  "sun",new BABYLON.Vector3(-.48,-1,-.32),scene
+);
+sun.position=new BABYLON.Vector3(45,65,35);
+sun.intensity=1.35;
+sun.diffuse=new BABYLON.Color3(1,.91,.76);
+sun.specular=new BABYLON.Color3(.35,.35,.30);
+
+const shadows=new BABYLON.ShadowGenerator(2048,sun);
+shadows.useBlurExponentialShadowMap=true;
+shadows.blurKernel=24;
+shadows.bias=.0005;
+shadows.normalBias=.025;
+shadows.setDarkness(.25);
+
+const pipeline=new BABYLON.DefaultRenderingPipeline(
+  "calidadUltra",true,scene,[camera]
+);
+pipeline.fxaaEnabled=true;
+pipeline.samples=4;
+pipeline.bloomEnabled=true;
+pipeline.bloomThreshold=.82;
+pipeline.bloomWeight=.12;
+pipeline.bloomKernel=32;
+pipeline.imageProcessingEnabled=true;
+pipeline.imageProcessing.contrast=1.15;
+pipeline.imageProcessing.exposure=1.1;
+
+function mat(name,color,roughness=1){
+  const m=new BABYLON.PBRMaterial(name,scene);
+  m.albedoColor=BABYLON.Color3.FromHexString(color);
+  m.roughness=roughness;
+  m.metallic=0;
+  return m;
+}
+
+function proceduralTexture(name,kind,size=512){
+  const tex=new BABYLON.DynamicTexture(
+    name,{width:size,height:size},scene,false
+  );
+  const ctx=tex.getContext();
+  const img=ctx.createImageData(size,size);
+  for(let y=0;y<size;y++){
+    for(let x=0;x<size;x++){
+      const i=(y*size+x)*4;
+      const grain=Math.random()*34-17;
+      const wave=(Math.sin(x*.045+Math.sin(y*.018)*3)+
+        Math.cos(y*.037+x*.012))*7;
+      let r,g,b;
+      if(kind==="grass"){
+        const v=grain+wave;
+        r=72+v;g=83+v;b=54+v*.65;
+      }else if(kind==="soil"){
+        const v=grain+wave;
+        r=112+v;g=94+v;b=69+v*.6;
+      }else{
+        const v=grain+wave*.4;
+        r=66+v;g=68+v;b=64+v;
+      }
+      img.data[i]=Math.max(0,Math.min(255,r));
+      img.data[i+1]=Math.max(0,Math.min(255,g));
+      img.data[i+2]=Math.max(0,Math.min(255,b));
+      img.data[i+3]=255;
+    }
+  }
+  ctx.putImageData(img,0,0);
+  tex.update(false);
+  tex.wrapU=BABYLON.Texture.WRAP_ADDRESSMODE;
+  tex.wrapV=BABYLON.Texture.WRAP_ADDRESSMODE;
+  return tex;
+}
+
+const grassTex=proceduralTexture("ground_grass","grass");
+grassTex.uScale=15;
+grassTex.vScale=15;
+const groundMat=mat("PBR_ground_grass","#68764f",1);
+groundMat.albedoTexture=grassTex;
+
+const ground=BABYLON.MeshBuilder.CreateGround("terrain",{
+  width:260,height:260,subdivisions:80
+},scene);
+ground.position.y=0;
+ground.material=groundMat;
+ground.isVisible=true;
+ground.visibility=1;
+ground.checkCollisions=true;
+ground.receiveShadows=true;
+
+const soilTex=proceduralTexture("soil_detail","soil");
+soilTex.uScale=4;
+soilTex.vScale=4;
+const soilMat=mat("earth_and_dirt","#77664c",1);
+soilMat.albedoTexture=soilTex;
+
+const roadTex=proceduralTexture("road_texture","road");
+roadTex.uScale=1;
+roadTex.vScale=18;
+const roadMat=mat("military_dirt_road","#55574e",1);
+roadMat.albedoTexture=roadTex;
+
+const road=BABYLON.MeshBuilder.CreateGround("dirt_road",{
+  width:8,height:180
+},scene);
+road.position.set(0,.025,0);
+road.material=roadMat;
+road.receiveShadows=true;
+
+const rockMat=mat("weathered_rock","#77796d");
+const darkRockMat=mat("dark_rock","#55594f");
+const concreteMat=mat("aged_concrete","#85877d");
+const wallMat=mat("military_wall","#656b5e");
+const metalMat=mat("dark_metal","#343b38",.7);
+const woodMat=mat("weathered_wood","#554b38");
+const sandbagMat=mat("sandbags","#8b8062");
+const leafMat=mat("olive_foliage","#485b38");
+const leafLightMat=mat("sunlit_foliage","#64744a");
+const trunkMat=mat("tree_bark","#514535");
+const windowMat=mat("dark_windows","#293433",.4);
+
+function addShadow(mesh){
+  if(mesh&&mesh.getTotalVertices&&mesh.getTotalVertices()>0){
+    shadows.addShadowCaster(mesh);
+  }
+  return mesh;
+}
+function box(name,pos,size,material,shadow=true){
+  const m=BABYLON.MeshBuilder.CreateBox(name,{
+    width:size[0],height:size[1],depth:size[2]
+  },scene);
+  m.position.set(pos[0],pos[1],pos[2]);
+  m.material=material;
+  m.checkCollisions=true;
+  if(shadow)addShadow(m);
+  return m;
+}
+function makeRock(name,x,y,z,sx,sy,sz,material){
+  const m=BABYLON.MeshBuilder.CreatePolyhedron(
+    name,{type:1,size:1},scene
+  );
+  m.position.set(x,y,z);
+  m.scaling.set(sx,sy,sz);
+  m.rotation.set(Math.random()*.3,Math.random()*6,Math.random()*.3);
+  m.material=material;
+  addShadow(m);
+  return m;
+}
+
+/* Colinas distantes */
+for(let i=0;i<34;i++){
+  const a=Math.PI*2*i/34;
+  const r=88+Math.random()*32;
+  const h=9+Math.random()*23;
+  const hill=BABYLON.MeshBuilder.CreateSphere("distant_hill_"+i,{
+    segments:7,diameter:1
+  },scene);
+  hill.position.set(Math.cos(a)*r,h*.35,Math.sin(a)*r);
+  hill.scaling.set(13+Math.random()*15,h,14+Math.random()*16);
+  hill.material=i%3===0?darkRockMat:rockMat;
+  hill.isPickable=false;
+}
+
+/* Rocas */
+for(let i=0;i<40;i++){
+  const x=(Math.random()-.5)*220;
+  const z=(Math.random()-.5)*220;
+  if(Math.abs(x)<13)continue;
+  makeRock("ground_rock_"+i,x,.25,z,
+    .5+Math.random()*1.5,
+    .3+Math.random()*1.2,
+    .5+Math.random()*1.4,
+    i%2?rockMat:darkRockMat
+  );
+}
+
+/* Vegetación */
+function makeTree(x,z,scale=1){
+  const trunk=BABYLON.MeshBuilder.CreateCylinder("tree_trunk",{
+    height:3.4*scale,
+    diameterTop:.22*scale,
+    diameterBottom:.48*scale,
+    tessellation:7
+  },scene);
+  trunk.position.set(x,1.7*scale,z);
+  trunk.material=trunkMat;
+  addShadow(trunk);
+
+  for(let j=0;j<3;j++){
+    const crown=BABYLON.MeshBuilder.CreateSphere("tree_crown",{
+      segments:5,diameter:2.5*scale
+    },scene);
+    crown.position.set(
+      x+(Math.random()-.5)*.55*scale,
+      (3+j*.65)*scale,
+      z+(Math.random()-.5)*.45*scale
+    );
+    crown.scaling.set(1,.8,1);
+    crown.material=j===1?leafLightMat:leafMat;
+    addShadow(crown);
+  }
+}
+for(let i=0;i<65;i++){
+  const side=Math.random()<.5?-1:1;
+  const x=side*(10+Math.random()*100);
+  const z=(Math.random()-.5)*220;
+  makeTree(x,z,.7+Math.random()*.75);
+}
+
+/* Edificios militares */
+function makeBuilding(x,z,w=10,d=8){
+  box("bunker_body",[x,1.7,z],[w,3.4,d],concreteMat);
+  box("bunker_roof",[x,3.55,z],[w+1,.45,d+1],wallMat);
+  box("bunker_door",[x,1.05,z-d/2-.035],
+      [1.7,2.1,.08],metalMat,false);
+  for(let j=-1;j<=1;j++){
+    box("bunker_window",[x+j*w*.28,2.2,z-d/2-.045],
+        [.8,.45,.07],windowMat,false);
+  }
+  box("roof_sandbag",[x,3.9,z],[w*.65,.3,.65],sandbagMat);
+}
+makeBuilding(-23,12,11,9);
+makeBuilding(23,-18,12,10);
+makeBuilding(-34,-32,8,7);
+makeBuilding(34,30,9,8);
+
+for(let i=0;i<9;i++){
+  box("sandbag_line_"+i,[-5+i*1.25,.35,12],
+      [1.2,.65,.75],sandbagMat);
+}
+box("checkpoint_left",[-5,1.4,-8],[.6,2.8,.6],metalMat);
+box("checkpoint_right",[5,1.4,-8],[.6,2.8,.6],metalMat);
+box("checkpoint_beam",[0,2.8,-8],[10.6,.5,.6],wallMat);
+box("checkpoint_sign",[0,2.25,-8.36],[3.4,.7,.12],metalMat,false);
+
+for(let i=0;i<12;i++){
+  const x=(Math.random()-.5)*70;
+  const z=(Math.random()-.5)*70;
+  if(Math.abs(x)<7&&Math.abs(z)<12)continue;
+  const crate=box("supply_crate_"+i,[x,.55,z],
+      [1.1,1.1,1.1],i%2?woodMat:sandbagMat);
+  crate.rotation.y=Math.random()*Math.PI;
+}
+
+/* El código continúa en la parte 2 */
+
+/* SOLDADO EN TERCERA PERSONA */
+const playerRoot=new BABYLON.TransformNode("soldier_root",scene);
+playerRoot.position.set(0,0,-24);
+
+const uniformMat=mat("combat_uniform","#424d3c");
+const vestMat=mat("tactical_vest","#353d32");
+const skinMat=mat("skin","#b18a68");
+const bootMat=mat("combat_boots","#242923");
+const helmetMat=mat("combat_helmet","#333d30");
+const weaponMat=mat("rifle_metal","#242a27",.65);
+
+function playerPart(name,size,pos,material){
+  const m=BABYLON.MeshBuilder.CreateBox(name,size,scene);
+  m.position.set(pos[0],pos[1],pos[2]);
+  m.material=material;
+  m.parent=playerRoot;
+  return m;
+}
+function playerSphere(name,diameter,pos,material){
+  const m=BABYLON.MeshBuilder.CreateSphere(name,{
+    diameter,segments:8
+  },scene);
+  m.position.set(pos[0],pos[1],pos[2]);
+  m.material=material;
+  m.parent=playerRoot;
+  return m;
+}
+
+playerPart("soldier_torso",{width:.72,height:.9,depth:.4},
+  [0,1.35,0],uniformMat);
+playerPart("soldier_vest",{width:.76,height:.58,depth:.44},
+  [0,1.42,-.015],vestMat);
+playerSphere("soldier_head",.43,[0,2.05,0],skinMat);
+playerSphere("soldier_helmet",.48,[0,2.22,0],helmetMat);
+playerPart("soldier_left_leg",{width:.25,height:.75,depth:.29},
+  [-.2,.65,0],uniformMat);
+playerPart("soldier_right_leg",{width:.25,height:.75,depth:.29},
+  [.2,.65,0],uniformMat);
+playerPart("soldier_left_boot",{width:.29,height:.18,depth:.42},
+  [-.2,.14,-.05],bootMat);
+playerPart("soldier_right_boot",{width:.29,height:.18,depth:.42},
+  [.2,.14,-.05],bootMat);
+playerPart("soldier_left_arm",{width:.24,height:.72,depth:.27},
+  [-.48,1.42,-.02],uniformMat);
+playerPart("soldier_right_arm",{width:.24,height:.72,depth:.27},
+  [.48,1.42,-.02],uniformMat);
+playerPart("soldier_rifle",{width:.16,height:.15,depth:1.05},
+  [.43,1.22,-.48],weaponMat);
+
+const playerCollider=BABYLON.MeshBuilder.CreateCapsule(
+  "player_collision",{height:2.15,radius:.38,tessellation:8},scene
+);
+playerCollider.position.set(0,1.08,-24);
+playerCollider.isVisible=false;
+playerCollider.isPickable=false;
+playerCollider.checkCollisions=true;
+playerCollider.ellipsoid=new BABYLON.Vector3(.38,1.05,.38);
+playerCollider.ellipsoidOffset=new BABYLON.Vector3(0,1.05,0);
+
+const playerSpeed=.18;
+let isJumping=false;
+let verticalVelocity=0;
+let score=0;
+let lastFire=0;
+let moveForward=0;
+let moveSide=0;
+const keys={};
+
+camera.target=new BABYLON.Vector3(0,1.5,-24);
+camera.alpha=Math.PI*1.5;
+camera.beta=1.12;
+camera.radius=8;
+
+const capturePoint=BABYLON.MeshBuilder.CreateCylinder(
+  "capture_zone",{height:.12,diameter:8,tessellation:32},scene
+);
+capturePoint.position.set(0,.09,20);
+
+const captureMat=new BABYLON.StandardMaterial(
+  "capture_zone_material",scene
+);
+captureMat.diffuseColor=new BABYLON.Color3(.2,.65,.32);
+captureMat.emissiveColor=new BABYLON.Color3(.06,.25,.08);
+captureMat.alpha=.36;
+capturePoint.material=captureMat;
+
+const captureRing=BABYLON.MeshBuilder.CreateTorus(
+  "capture_ring",{diameter:8,thickness:.14,tessellation:48},scene
+);
+captureRing.position.set(0,.2,20);
+
+const ringMat=new BABYLON.StandardMaterial("ring_material",scene);
+ringMat.emissiveColor=new BABYLON.Color3(.4,1,.4);
+captureRing.material=ringMat;
+
+const marker=BABYLON.MeshBuilder.CreateCylinder(
+  "capture_marker",{
+    height:5,diameterTop:.05,diameterBottom:.05,tessellation:6
+  },scene
+);
+marker.position.set(0,3,20);
+
+const markerMat=new BABYLON.StandardMaterial("marker_material",scene);
+markerMat.emissiveColor=new BABYLON.Color3(.2,1,.3);
+markerMat.alpha=.45;
+marker.material=markerMat;
+
+function showNotice(text){
+  notice.textContent=text;
+  notice.style.display="block";
+  clearTimeout(showNotice.timer);
+  showNotice.timer=setTimeout(()=>{
+    notice.style.display="none";
+  },2200);
+}
+
+/* JOYSTICK TÁCTIL */
+const stickArea=document.getElementById("stickArea");
+const stick=document.getElementById("stick");
+let stickPointer=null;
+
+function updateJoystick(dx,dy){
+  const max=40;
+  const len=Math.sqrt(dx*dx+dy*dy)||1;
+  if(len>max){
+    dx=dx/len*max;
+    dy=dy/len*max;
+  }
+  stick.style.transform="translate("+dx+"px,"+dy+"px)";
+  moveSide=dx/max;
+  moveForward=-dy/max;
+}
+function resetJoystick(){
+  stick.style.transform="translate(0,0)";
+  moveSide=0;
+  moveForward=0;
+}
+stickArea.addEventListener("pointerdown",e=>{
+  e.preventDefault();
+  stickPointer=e.pointerId;
+  stickArea.setPointerCapture(e.pointerId);
+  const r=stickArea.getBoundingClientRect();
+  updateJoystick(
+    e.clientX-(r.left+r.width/2),
+    e.clientY-(r.top+r.height/2)
+  );
+});
+stickArea.addEventListener("pointermove",e=>{
+  if(e.pointerId!==stickPointer)return;
+  const r=stickArea.getBoundingClientRect();
+  updateJoystick(
+    e.clientX-(r.left+r.width/2),
+    e.clientY-(r.top+r.height/2)
+  );
+});
+function releaseStick(e){
+  if(e.pointerId===stickPointer){
+    stickPointer=null;
+    resetJoystick();
+  }
+}
+stickArea.addEventListener("pointerup",releaseStick);
+stickArea.addEventListener("pointercancel",releaseStick);
+
+/* TECLADO PARA PROBAR EN OTROS DISPOSITIVOS */
+window.addEventListener("keydown",e=>{
+  keys[e.key.toLowerCase()]=true;
+  if(e.code==="Space")jump();
+});
+window.addEventListener("keyup",e=>{
+  keys[e.key.toLowerCase()]=false;
+});
+
+/* CONTROL DE CÁMARA TÁCTIL */
+let lookPointer=null;
+let lastX=0;
+let lastY=0;
+
+canvas.addEventListener("pointerdown",e=>{
+  if(e.pointerType!=="touch"||stickPointer!==null)return;
+  lookPointer=e.pointerId;
+  lastX=e.clientX;
+  lastY=e.clientY;
+});
+canvas.addEventListener("pointermove",e=>{
+  if(e.pointerId!==lookPointer)return;
+  const dx=e.clientX-lastX;
+  const dy=e.clientY-lastY;
+  lastX=e.clientX;
+  lastY=e.clientY;
+  camera.alpha-=dx*.006;
+  camera.beta=Math.max(.4,Math.min(1.45,camera.beta+dy*.004));
+});
+function stopLook(e){
+  if(e.pointerId===lookPointer)lookPointer=null;
+}
+canvas.addEventListener("pointerup",stopLook);
+canvas.addEventListener("pointercancel",stopLook);
+
+function jump(){
+  if(!isJumping){
+    isJumping=true;
+    verticalVelocity=.22;
+  }
+}
+document.getElementById("jumpBtn").addEventListener("pointerdown",e=>{
+  e.preventDefault();
+  jump();
+});
+
+/* DISPARO VISUAL */
+function shoot(){
+  const now=performance.now();
+  if(now-lastFire<350)return;
+  lastFire=now;
+
+  const start=playerRoot.position.add(
+    new BABYLON.Vector3(0,1.4,0)
+  );
+  const forward=new BABYLON.Vector3(
+    -Math.sin(camera.alpha),0,-Math.cos(camera.alpha)
+  );
+  const end=start.add(forward.scale(28));
+  const length=BABYLON.Vector3.Distance(start,end);
+
+  const tracer=BABYLON.MeshBuilder.CreateCylinder("shot_tracer",{
+    height:length,diameter:.035,tessellation:5
+  },scene);
+  tracer.position=start.add(end).scale(.5);
+  tracer.lookAt(end);
+
+  const tracerMat=new BABYLON.StandardMaterial(
+    "tracer_material_"+now,scene
+  );
+  tracerMat.emissiveColor=new BABYLON.Color3(1,.75,.35);
+  tracer.material=tracerMat;
+
+  setTimeout(()=>{
+    tracer.dispose();
+    tracerMat.dispose();
+  },100);
+}
+document.getElementById("fireBtn").addEventListener("pointerdown",e=>{
+  e.preventDefault();
+  shoot();
+});
+
+/* CAPTURAR OBJETIVO */
+document.getElementById("captureBtn").addEventListener("pointerdown",e=>{
+  e.preventDefault();
+  const distance=BABYLON.Vector3.Distance(
+    playerRoot.position,new BABYLON.Vector3(0,0,20)
+  );
+  if(distance<7){
+    score++;
+    document.getElementById("scoreText").textContent=
+      "ZONAS ASEGURADAS: "+score;
+    document.getElementById("missionText").textContent=
+      "Sector asegurado. Continúa explorando el campo.";
+    captureMat.emissiveColor=new BABYLON.Color3(.1,.5,.1);
+    ringMat.emissiveColor=new BABYLON.Color3(.4,1,.4);
+    showNotice("ZONA ASEGURADA");
+  }else{
+    showNotice("ACÉRCATE A LA ZONA VERDE");
+  }
+});
+
+/* MOVIMIENTO DEL SOLDADO */
+function movePlayer(){
+  const forwardInput=
+    moveForward+
+    (keys["w"]||keys["arrowup"]?1:0)-
+    (keys["s"]||keys["arrowdown"]?1:0);
+
+  const sideInput=
+    moveSide+
+    (keys["d"]||keys["arrowright"]?1:0)-
+    (keys["a"]||keys["arrowleft"]?1:0);
+
+  const forward=new BABYLON.Vector3(
+    -Math.sin(camera.alpha),0,-Math.cos(camera.alpha)
+  );
+  const right=new BABYLON.Vector3(
+    Math.cos(camera.alpha),0,-Math.sin(camera.alpha)
+  );
+  const direction=forward.scale(forwardInput)
+    .add(right.scale(sideInput));
+
+  if(direction.lengthSquared()>1)direction.normalize();
+
+  if(direction.lengthSquared()>.01){
+    playerRoot.rotation.y=Math.atan2(-direction.x,-direction.z);
+    playerCollider.moveWithCollisions(
+      direction.scale(playerSpeed)
+    );
+  }
+
+  if(isJumping){
+    verticalVelocity-=.012;
+    playerCollider.moveWithCollisions(
+      new BABYLON.Vector3(0,verticalVelocity,0)
+    );
+    if(playerCollider.position.y<=1.08&&verticalVelocity<0){
+      playerCollider.position.y=1.08;
+      verticalVelocity=0;
+      isJumping=false;
+    }
+  }
+
+  playerRoot.position.x=playerCollider.position.x;
+  playerRoot.position.z=playerCollider.position.z;
+  playerRoot.position.y=Math.max(
+    0,playerCollider.position.y-1.08
+  );
+
+  camera.target.x=playerRoot.position.x;
+  camera.target.y=playerRoot.position.y+1.55;
+  camera.target.z=playerRoot.position.z;
+
+  const sx=Math.floor((playerRoot.position.x+130)/20);
+  const sz=Math.floor((playerRoot.position.z+130)/20);
+  document.getElementById("position").textContent=
+    "SECTOR "+String(Math.max(1,sx)).padStart(2,"0")+"-"+
+    String(Math.max(1,sz)).padStart(2,"0");
+}
+
+/* ACTUALIZACIÓN DE LA ESCENA */
+scene.onBeforeRenderObservable.add(()=>{
+  captureRing.rotation.y+=.003;
+  marker.position.y=2.8+Math.sin(performance.now()*.002)*.25;
+});
+
+engine.runRenderLoop(()=>{
+  if(scene.isDisposed())return;
+  movePlayer();
+  scene.render();
+  document.getElementById("fps").textContent=
+    "RENDIMIENTO: "+Math.round(engine.getFps())+" FPS";
+});
+
+window.addEventListener("resize",()=>engine.resize());
+
+setTimeout(()=>{
+  loading.style.transition="opacity .5s";
+  loading.style.opacity="0";
+  setTimeout(()=>loading.style.display="none",550);
+},1200);
+
+showNotice("CAMPO OPERATIVO · EXPLORA Y ASEGURA LA ZONA");
+})();
+</script>
+</body>
+</html>
